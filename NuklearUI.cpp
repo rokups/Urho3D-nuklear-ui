@@ -33,7 +33,10 @@ using namespace Urho3D;
 NuklearUI::NuklearUI(Context* ctx)
     : Urho3D::Object(ctx)
 {
+    GraphicsApiState state = { };
+    GraphicsApiStateBackup(state);
     _nk_ctx = nk_sdl_init(GetSubsystem<Graphics>()->GetWindow());
+    GraphicsApiStateRestore(state);
 
     SubscribeToEvent(E_ENDFRAME, URHO3D_HANDLER(NuklearUI, OnEndFrame));
     SubscribeToEvent(E_SDL_RAW_INPUT_EVENT, URHO3D_HANDLER(NuklearUI, OnRawEvent));
@@ -67,5 +70,57 @@ void NuklearUI::OnEndRendering(StringHash, VariantMap&)
 {
     const int MAX_VERTEX_MEMORY = 512 * 1024;
     const int MAX_ELEMENT_MEMORY = 128 * 1024;
+    GraphicsApiState state = { };
+    GraphicsApiStateBackup(state);
     nk_sdl_render(NK_ANTI_ALIASING_ON, MAX_VERTEX_MEMORY, MAX_ELEMENT_MEMORY);
+    GraphicsApiStateRestore(state);
+}
+
+// Copyright (c) 2016 Yehonatan Ballas
+void NuklearUI::GraphicsApiStateBackup(NuklearUI::GraphicsApiState& state)
+{
+    glGetIntegerv(GL_CURRENT_PROGRAM, &state.last_program);
+    glGetIntegerv(GL_TEXTURE_BINDING_2D, &state.last_texture);
+    glGetIntegerv(GL_ARRAY_BUFFER_BINDING, &state.last_array_buffer);
+    glGetIntegerv(GL_ELEMENT_ARRAY_BUFFER_BINDING, &state.last_element_array_buffer);
+    glGetIntegerv(GL_VERTEX_ARRAY_BINDING, &state.last_vertex_array);
+    glGetIntegerv(GL_BLEND_SRC, &state.last_blend_src);
+    glGetIntegerv(GL_BLEND_DST, &state.last_blend_dst);
+    glGetIntegerv(GL_BLEND_EQUATION_RGB, &state.last_blend_equation_rgb);
+    glGetIntegerv(GL_BLEND_EQUATION_ALPHA, &state.last_blend_equation_alpha);
+    glGetIntegerv(GL_VIEWPORT, state.last_viewport);
+    state.last_enable_blend = glIsEnabled(GL_BLEND);
+    state.last_enable_cull_face = glIsEnabled(GL_CULL_FACE);
+    state.last_enable_depth_test = glIsEnabled(GL_DEPTH_TEST);
+    state.last_enable_scissor_test = glIsEnabled(GL_SCISSOR_TEST);
+}
+
+// Copyright (c) 2016 Yehonatan Ballas
+void NuklearUI::GraphicsApiStateRestore(NuklearUI::GraphicsApiState& state)
+{
+    glUseProgram((GLuint)state.last_program);
+    glBindTexture(GL_TEXTURE_2D, (GLuint)state.last_texture);
+    glBindVertexArray((GLuint)state.last_vertex_array);
+    glBindBuffer(GL_ARRAY_BUFFER, (GLuint)state.last_array_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, (GLuint)state.last_element_array_buffer);
+    glBlendEquationSeparate((GLenum)state.last_blend_equation_rgb, (GLenum)state.last_blend_equation_alpha);
+    glBlendFunc((GLenum)state.last_blend_src, (GLenum)state.last_blend_dst);
+    if (state.last_enable_blend)
+        glEnable(GL_BLEND);
+    else
+        glDisable(GL_BLEND);
+    if (state.last_enable_cull_face)
+        glEnable(GL_CULL_FACE);
+    else
+        glDisable(GL_CULL_FACE);
+    if (state.last_enable_depth_test)
+        glEnable(GL_DEPTH_TEST);
+    else
+        glDisable(GL_DEPTH_TEST);
+    if (state.last_enable_scissor_test)
+        glEnable(GL_SCISSOR_TEST);
+    else
+        glDisable(GL_SCISSOR_TEST);
+    glViewport(state.last_viewport[0], state.last_viewport[1], (GLsizei)state.last_viewport[2],
+               (GLsizei)state.last_viewport[3]);
 }

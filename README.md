@@ -25,8 +25,3 @@ Usage
     // Additional font initialization here. See https://github.com/vurtun/nuklear/blob/master/demo/sdl_opengl3/main.c
     nk_sdl_font_stash_end();
 ```
-
-Known issues
-============
-
-Code does not compile, complains about missing opengl API functions. Add `#define GL_GLEXT_PROTOTYPES 1` before `#include <SDL2/SDL.h>` in `nuklear_sdl_gl3.h`.
