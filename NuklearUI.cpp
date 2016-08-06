@@ -27,8 +27,29 @@
 #include <Urho3D/Core/CoreEvents.h>
 #include <Urho3D/Input/InputEvents.h>
 #include <Urho3D/Graphics/GraphicsEvents.h>
+#define GL_GLEXT_PROTOTYPES 1
+#include "nuklear/demo/sdl_opengl3/nuklear_sdl_gl3.h"
 
 using namespace Urho3D;
+
+
+struct NuklearUI::GraphicsApiState
+{
+    GLint last_program;
+    GLint last_texture;
+    GLint last_array_buffer;
+    GLint last_element_array_buffer;
+    GLint last_vertex_array;
+    GLint last_blend_src;
+    GLint last_blend_dst;
+    GLint last_blend_equation_rgb;
+    GLint last_blend_equation_alpha;
+    GLint last_viewport[4];
+    GLboolean last_enable_blend;
+    GLboolean last_enable_cull_face;
+    GLboolean last_enable_depth_test;
+    GLboolean last_enable_scissor_test;
+};
 
 NuklearUI::NuklearUI(Context* ctx)
     : Urho3D::Object(ctx)
@@ -38,10 +59,17 @@ NuklearUI::NuklearUI(Context* ctx)
     _nk_ctx = nk_sdl_init(GetSubsystem<Graphics>()->GetWindow());
     GraphicsApiStateRestore(state);
 
-    SubscribeToEvent(E_ENDFRAME, URHO3D_HANDLER(NuklearUI, OnEndFrame));
-    SubscribeToEvent(E_SDL_RAW_INPUT_EVENT, URHO3D_HANDLER(NuklearUI, OnRawEvent));
-    SubscribeToEvent(E_POSTUPDATE, URHO3D_HANDLER(NuklearUI, OnPostUpdate));
+    SubscribeToEvent(E_INPUTBEGIN, URHO3D_HANDLER(NuklearUI, OnInputBegin));
+    SubscribeToEvent(E_SDLRAWINPUT, URHO3D_HANDLER(NuklearUI, OnRawEvent));
+    SubscribeToEvent(E_INPUTEND, URHO3D_HANDLER(NuklearUI, OnInputEnd));
     SubscribeToEvent(E_ENDRENDERING, URHO3D_HANDLER(NuklearUI, OnEndRendering));
+
+    nk_sdl_font_stash_begin(&_atlas);
+}
+
+void NuklearUI::FinalizeFonts()
+{
+    nk_sdl_font_stash_end();
 }
 
 NuklearUI::~NuklearUI()
@@ -49,19 +77,17 @@ NuklearUI::~NuklearUI()
     nk_sdl_shutdown();
 }
 
-void NuklearUI::OnEndFrame(StringHash, VariantMap&)
+void NuklearUI::OnInputBegin(StringHash, VariantMap&)
 {
-    // Begin capturing input for nuklear. This is done in E_ENDFRAME in order to begin capturing before E_BEGINFRAME
-    // where Urho3D does input handling.
     nk_input_begin(_nk_ctx);
 }
 
 void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
 {
-    nk_sdl_handle_event(static_cast<SDL_Event*>(args[SdlRawInputEvent::P_SDL_EVENT].Get<void*>()));
+    nk_sdl_handle_event(static_cast<SDL_Event*>(args[SdlRawInput::P_SDL_EVENT].Get<void*>()));
 }
 
-void NuklearUI::OnPostUpdate(StringHash, VariantMap&)
+void NuklearUI::OnInputEnd(StringHash, VariantMap&)
 {
     nk_input_end(_nk_ctx);
 }

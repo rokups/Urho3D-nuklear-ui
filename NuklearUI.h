@@ -23,7 +23,6 @@
 
 
 #include <Urho3D/Core/Object.h>
-
 #define NK_INCLUDE_VERTEX_BUFFER_OUTPUT 1
 #define NK_INCLUDE_FONT_BAKING 1
 #define NK_INCLUDE_DEFAULT_FONT 1
@@ -31,10 +30,7 @@
 #define NK_INCLUDE_STANDARD_IO 1
 #define NK_INCLUDE_FIXED_TYPES 1
 #define NK_INCLUDE_DEFAULT_ALLOCATOR 1
-#define GL_GLEXT_PROTOTYPES 1
-#include "nuklear.h"
-#include "nuklear_sdl_gl3.h"
-
+#include "nuklear/nuklear.h"
 
 class NuklearUI
     : public Urho3D::Object
@@ -46,34 +42,21 @@ public:
 
     nk_context* GetNkContext() const { return _nk_ctx; }
     operator nk_context*() const { return _nk_ctx; }
+    nk_font_atlas* GetFontAtlas() const { return _atlas; }
+    void FinalizeFonts();
 
 protected:
-    void OnEndFrame(Urho3D::StringHash, Urho3D::VariantMap&);
+    void OnInputBegin(Urho3D::StringHash, Urho3D::VariantMap&);
     void OnRawEvent(Urho3D::StringHash, Urho3D::VariantMap& args);
-    void OnPostUpdate(Urho3D::StringHash, Urho3D::VariantMap&);
+    void OnInputEnd(Urho3D::StringHash, Urho3D::VariantMap&);
     void OnEndRendering(Urho3D::StringHash, Urho3D::VariantMap&);
 
-    struct GraphicsApiState
-    {
-        GLint last_program;
-        GLint last_texture;
-        GLint last_array_buffer;
-        GLint last_element_array_buffer;
-        GLint last_vertex_array;
-        GLint last_blend_src;
-        GLint last_blend_dst;
-        GLint last_blend_equation_rgb;
-        GLint last_blend_equation_alpha;
-        GLint last_viewport[4];
-        GLboolean last_enable_blend;
-        GLboolean last_enable_cull_face;
-        GLboolean last_enable_depth_test;
-        GLboolean last_enable_scissor_test;
-    };
+    struct GraphicsApiState;
     void GraphicsApiStateBackup(GraphicsApiState& state);
     void GraphicsApiStateRestore(GraphicsApiState& state);
 
-    nk_context* _nk_ctx;
+    nk_context* _nk_ctx = 0;
+    nk_font_atlas* _atlas = 0;
 };
 
 
