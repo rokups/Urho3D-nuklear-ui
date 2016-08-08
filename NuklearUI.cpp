@@ -84,7 +84,7 @@ void NuklearUI::OnInputBegin(StringHash, VariantMap&)
 
 void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
 {
-    nk_sdl_handle_event(static_cast<SDL_Event*>(args[SdlRawInput::P_SDL_EVENT].Get<void*>()));
+    nk_sdl_handle_event(static_cast<SDL_Event*>(args[SDLRawInput::P_SDLEVENT].Get<void*>()));
 }
 
 void NuklearUI::OnInputEnd(StringHash, VariantMap&)
