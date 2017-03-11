@@ -23,13 +23,9 @@
 
 
 #include <Urho3D/Core/Object.h>
-#define NK_INCLUDE_VERTEX_BUFFER_OUTPUT 1
-#define NK_INCLUDE_FONT_BAKING 1
-#define NK_INCLUDE_DEFAULT_FONT 1
-#define NK_INCLUDE_COMMAND_USERDATA 1
-#define NK_INCLUDE_STANDARD_IO 1
-#define NK_INCLUDE_FIXED_TYPES 1
-#define NK_INCLUDE_DEFAULT_ALLOCATOR 1
+#include <Urho3D/Graphics/VertexBuffer.h>
+#include <Urho3D/Graphics/IndexBuffer.h>
+#include <Urho3D/Graphics/Texture2D.h>
 #include "nuklear/nuklear.h"
 
 class NuklearUI
@@ -40,9 +36,9 @@ public:
     NuklearUI(Urho3D::Context* ctx);
     virtual ~NuklearUI();
 
-    nk_context* GetNkContext() const { return _nk_ctx; }
-    operator nk_context*() const { return _nk_ctx; }
-    nk_font_atlas* GetFontAtlas() const { return _atlas; }
+    nk_context* GetNkContext() { return &_nk_ctx; }
+    operator nk_context*() { return &_nk_ctx; }
+    nk_font_atlas* GetFontAtlas() { return &_atlas; }
     void FinalizeFonts();
 
 protected:
@@ -52,11 +48,19 @@ protected:
     void OnEndRendering(Urho3D::StringHash, Urho3D::VariantMap&);
 
     struct GraphicsApiState;
-    void GraphicsApiStateBackup(GraphicsApiState& state);
-    void GraphicsApiStateRestore(GraphicsApiState& state);
 
-    nk_context* _nk_ctx = 0;
-    nk_font_atlas* _atlas = 0;
+    static void ClipboardCopy(nk_handle usr, const char* text, int len);
+    static void ClipboardPaste(nk_handle usr, struct nk_text_edit *edit);
+
+    Urho3D::Graphics* _graphics = 0;
+
+    nk_context _nk_ctx;
+    nk_font_atlas _atlas;
+    struct nk_buffer _commands;
+    struct nk_draw_null_texture _null_texture;
+    Urho3D::VertexBuffer* _vertex_buffer;
+    Urho3D::IndexBuffer* _index_buffer;
+    Urho3D::Vector<Urho3D::SharedPtr<Urho3D::Texture2D>> _font_textures;
 };
 
 
