@@ -113,6 +113,7 @@ void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
 {
     auto evt = static_cast<SDL_Event*>(args[SDLRawInput::P_SDLEVENT].Get<void*>());
     auto ctx = &_nk_ctx;
+    //keybindings
     if (evt->type == SDL_KEYUP || evt->type == SDL_KEYDOWN)
     {
         /* key events */
