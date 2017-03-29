@@ -26,7 +26,7 @@
 #include <Urho3D/Graphics/VertexBuffer.h>
 #include <Urho3D/Graphics/IndexBuffer.h>
 #include <Urho3D/Graphics/Texture2D.h>
-#include "nuklear/nuklear.h"
+#include <nuklear/nuklear.h>
 
 class NuklearUI
     : public Urho3D::Object
@@ -47,20 +47,22 @@ protected:
     void OnInputEnd(Urho3D::StringHash, Urho3D::VariantMap&);
     void OnEndRendering(Urho3D::StringHash, Urho3D::VariantMap&);
 
-    struct GraphicsApiState;
-
     static void ClipboardCopy(nk_handle usr, const char* text, int len);
     static void ClipboardPaste(nk_handle usr, struct nk_text_edit *edit);
 
-    Urho3D::Graphics* _graphics = 0;
+    const int MAX_VERTEX_MEMORY = 2048 * 1024;
+    const int MAX_ELEMENT_MEMORY = 512 * 1024;
 
+    Urho3D::Graphics* _graphics = 0;
     nk_context _nk_ctx;
-    nk_font_atlas _atlas;
+    struct nk_font_atlas _atlas;
     struct nk_buffer _commands;
     struct nk_draw_null_texture _null_texture;
     Urho3D::VertexBuffer* _vertex_buffer;
     Urho3D::IndexBuffer* _index_buffer;
     Urho3D::Vector<Urho3D::SharedPtr<Urho3D::Texture2D>> _font_textures;
+    float _uiScale = 1.0f;
+    struct nk_convert_config _config;
 };
 
 

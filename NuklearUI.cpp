@@ -52,7 +52,7 @@ void NuklearUI::ClipboardPaste(nk_handle usr, struct nk_text_edit *edit)
 }
 
 NuklearUI::NuklearUI(Context* ctx)
-    : Urho3D::Object(ctx)
+    : Object(ctx)
     , _graphics(GetSubsystem<Graphics>())
 {
     nk_init_default(&_nk_ctx, 0);
@@ -61,14 +61,38 @@ NuklearUI::NuklearUI(Context* ctx)
     _nk_ctx.clip.userdata = nk_handle_ptr(0);
 
     nk_buffer_init_default(&_commands);
-    _index_buffer = new Urho3D::IndexBuffer(_graphics->GetContext());
-    _vertex_buffer = new Urho3D::VertexBuffer(_graphics->GetContext());
-    Urho3D::Texture2D* nullTex = new Urho3D::Texture2D(_graphics->GetContext());
+    _index_buffer = new IndexBuffer(_graphics->GetContext());
+    _vertex_buffer = new VertexBuffer(_graphics->GetContext());
+    Texture2D* nullTex = new Texture2D(_graphics->GetContext());
     nullTex->SetNumLevels(1);
     unsigned whiteOpaque = 0xffffffff;
-    nullTex->SetSize(1, 1, Urho3D::Graphics::GetRGBAFormat());
+    nullTex->SetSize(1, 1, Graphics::GetRGBAFormat());
     nullTex->SetData(0, 0, 0, 1, 1, &whiteOpaque);
     _null_texture.texture.ptr = nullTex;
+
+    PODVector< VertexElement > elems;
+    elems.Push(VertexElement(TYPE_VECTOR2, SEM_POSITION));
+    elems.Push(VertexElement(TYPE_VECTOR2, SEM_TEXCOORD));
+    elems.Push(VertexElement(TYPE_UBYTE4_NORM, SEM_COLOR));
+    _vertex_buffer->SetSize(MAX_VERTEX_MEMORY / sizeof(nk_sdl_vertex), elems, true);
+    _index_buffer->SetSize(MAX_ELEMENT_MEMORY / sizeof(unsigned short), false, true);
+
+    static const struct nk_draw_vertex_layout_element vertex_layout[] = {
+        {NK_VERTEX_POSITION, NK_FORMAT_FLOAT,    NK_OFFSETOF(struct nk_sdl_vertex, position)},
+        {NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT,    NK_OFFSETOF(struct nk_sdl_vertex, uv)},
+        {NK_VERTEX_COLOR,    NK_FORMAT_R8G8B8A8, NK_OFFSETOF(struct nk_sdl_vertex, col)},
+        {NK_VERTEX_LAYOUT_END}};
+    NK_MEMSET(&_config, 0, sizeof(_config));
+    _config.vertex_layout = vertex_layout;
+    _config.vertex_size = sizeof(struct nk_sdl_vertex);
+    _config.vertex_alignment = NK_ALIGNOF(struct nk_sdl_vertex);
+    _config.null = _null_texture;
+    _config.circle_segment_count = 22;
+    _config.curve_segment_count = 22;
+    _config.arc_segment_count = 22;
+    _config.global_alpha = 1.0f;
+    _config.shape_AA = NK_ANTI_ALIASING_ON;
+    _config.line_AA = NK_ANTI_ALIASING_ON;
 
     SubscribeToEvent(E_INPUTBEGIN, URHO3D_HANDLER(NuklearUI, OnInputBegin));
     SubscribeToEvent(E_SDLRAWINPUT, URHO3D_HANDLER(NuklearUI, OnRawEvent));
@@ -85,9 +109,9 @@ void NuklearUI::FinalizeFonts()
     int w, h;
     image = nk_font_atlas_bake(&_atlas, &w, &h, NK_FONT_ATLAS_RGBA32);
 
-    Urho3D::SharedPtr<Urho3D::Texture2D> fontTex(new Urho3D::Texture2D(_graphics->GetContext()));
+    SharedPtr<Texture2D> fontTex(new Texture2D(_graphics->GetContext()));
     fontTex->SetNumLevels(1);
-    fontTex->SetSize(w, h, Urho3D::Graphics::GetRGBAFormat());
+    fontTex->SetSize(w, h, Graphics::GetRGBAFormat());
     fontTex->SetData(0, 0, 0, w, h, image);
 
     // Remember the created texture for cleanup
@@ -175,9 +199,6 @@ void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
             else
                 nk_input_key(ctx, NK_KEY_RIGHT, down);
         }
-        else
-            return /*0*/;
-        return /*1*/;
     }
     else if (evt->type == SDL_MOUSEBUTTONDOWN || evt->type == SDL_MOUSEBUTTONUP)
     {
@@ -190,7 +211,6 @@ void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
             nk_input_button(ctx, NK_BUTTON_MIDDLE, x, y, down);
         if (evt->button.button == SDL_BUTTON_RIGHT)
             nk_input_button(ctx, NK_BUTTON_RIGHT, x, y, down);
-        return /*1*/;
     }
     else if (evt->type == SDL_MOUSEMOTION)
     {
@@ -201,20 +221,15 @@ void NuklearUI::OnRawEvent(StringHash, VariantMap& args)
         }
         else
             nk_input_motion(ctx, evt->motion.x, evt->motion.y);
-        return /*1*/;
     }
     else if (evt->type == SDL_TEXTINPUT)
     {
         nk_glyph glyph = {};
         memcpy(glyph, evt->text.text, NK_UTF_SIZE);
         nk_input_glyph(ctx, glyph);
-        return /*1*/;
     }
     else if (evt->type == SDL_MOUSEWHEEL)
-    {
-        nk_input_scroll(ctx, (float)evt->wheel.y);
-        return /*1*/;
-    }
+        nk_input_scroll(ctx, {0, (float)evt->wheel.y});
 }
 
 void NuklearUI::OnInputEnd(StringHash, VariantMap&)
@@ -224,103 +239,107 @@ void NuklearUI::OnInputEnd(StringHash, VariantMap&)
 
 void NuklearUI::OnEndRendering(StringHash, VariantMap&)
 {
-    const int MAX_VERTEX_MEMORY = 512 * 1024;
-    const int MAX_ELEMENT_MEMORY = 128 * 1024;
-
-    _graphics->SetViewport(Urho3D::IntRect(0, 0, _graphics->GetWidth(), _graphics->GetHeight()));
-    _graphics->SetBlendMode(Urho3D::BLEND_ALPHA);
-    _graphics->SetCullMode(Urho3D::CULL_NONE);
-    _graphics->SetDepthTest(Urho3D::CMP_ALWAYS);
-    _graphics->SetFillMode(Urho3D::FILL_SOLID);
-    _graphics->SetColorWrite(true);
-    _graphics->SetDepthWrite(false);
+    // Engine does not render when window is closed or device is lost
+    assert(_graphics && _graphics->IsInitialized() && !_graphics->IsDeviceLost());
 
     // Max. vertex / index count is not assumed to change later
-    if (_vertex_buffer->GetVertexCount() == 0)
-    {
-        Urho3D::PODVector< Urho3D::VertexElement > elems;
-        elems.Push(Urho3D::VertexElement(Urho3D::TYPE_VECTOR2, Urho3D::SEM_POSITION));
-        elems.Push(Urho3D::VertexElement(Urho3D::TYPE_VECTOR2, Urho3D::SEM_TEXCOORD));
-        elems.Push(Urho3D::VertexElement(Urho3D::TYPE_UBYTE4_NORM, Urho3D::SEM_COLOR));
-
-        _vertex_buffer->SetSize(MAX_VERTEX_MEMORY / sizeof(nk_sdl_vertex), elems, true);
-    }
-
-    if (_index_buffer->GetIndexCount() == 0)
-        _index_buffer->SetSize(MAX_ELEMENT_MEMORY / sizeof(unsigned short), false, true);
-
     void* vertexData = _vertex_buffer->Lock(0, _vertex_buffer->GetVertexCount(), true);
     void* indexData = _index_buffer->Lock(0, _index_buffer->GetIndexCount(), true);
-
     if (vertexData && indexData)
     {
-        struct nk_convert_config config;
-        static const struct nk_draw_vertex_layout_element vertex_layout[] = {
-            {NK_VERTEX_POSITION, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, position)},
-            {NK_VERTEX_TEXCOORD, NK_FORMAT_FLOAT, NK_OFFSETOF(struct nk_sdl_vertex, uv)},
-            {NK_VERTEX_COLOR, NK_FORMAT_R8G8B8A8, NK_OFFSETOF(struct nk_sdl_vertex, col)},
-            {NK_VERTEX_LAYOUT_END}};
-        NK_MEMSET(&config, 0, sizeof(config));
-        config.vertex_layout = vertex_layout;
-        config.vertex_size = sizeof(struct nk_sdl_vertex);
-        config.vertex_alignment = NK_ALIGNOF(struct nk_sdl_vertex);
-        config.null = _null_texture;
-        config.circle_segment_count = 22;
-        config.curve_segment_count = 22;
-        config.arc_segment_count = 22;
-        config.global_alpha = 1.0f;
-        config.shape_AA = NK_ANTI_ALIASING_ON;
-        config.line_AA = NK_ANTI_ALIASING_ON;
+        struct nk_buffer vbuf, ebuf;
+        nk_buffer_init_fixed(&vbuf, vertexData, (nk_size)MAX_VERTEX_MEMORY);
+        nk_buffer_init_fixed(&ebuf, indexData, (nk_size)MAX_ELEMENT_MEMORY);
+        nk_convert(&_nk_ctx, &_commands, &vbuf, &ebuf, &_config);
 
+#if defined(_WIN32) && !defined(URHO3D_D3D11) && !defined(URHO3D_OPENGL)
+        for (int i = 0; i < _vertex_buffer->GetVertexCount(); i++)
         {
-            struct nk_buffer vbuf, ebuf;
-            nk_buffer_init_fixed(&vbuf, vertexData, (nk_size)MAX_VERTEX_MEMORY);
-            nk_buffer_init_fixed(&ebuf, indexData, (nk_size)MAX_ELEMENT_MEMORY);
-            nk_convert(&_nk_ctx, &_commands, &vbuf, &ebuf, &config);
+            nk_sdl_vertex* v = (nk_sdl_vertex*)vertexData + i;
+            v->position[0] += 0.5f;
+            v->position[1] += 0.5f;
         }
+#endif
 
-        Urho3D::IntVector2 viewSize = _graphics->GetViewport().Size();
-        Urho3D::Vector2 invScreenSize(1.0f / (float)viewSize.x_, 1.0f / (float)viewSize.y_);
-        Urho3D::Vector2 scale(2.0f * invScreenSize.x_, -2.0f * invScreenSize.y_);
+        IntVector2 viewSize = _graphics->GetViewport().Size();
+        Vector2 invScreenSize(1.0f / (float)viewSize.x_, 1.0f / (float)viewSize.y_);
+        Vector2 scale(2.0f * invScreenSize.x_, -2.0f * invScreenSize.y_);
+        Vector2 offset(-1.0f, 1.0f);
 
-        Urho3D::Matrix4 projection(Urho3D::Matrix4::IDENTITY);
-        projection.m00_ = scale.x_;
-        projection.m03_ = -1.0f;
-        projection.m11_ = scale.y_;
-        projection.m13_ = 1.0f;
+        Matrix4 projection(Matrix4::IDENTITY);
+        projection.m00_ = scale.x_ * _uiScale;
+        projection.m03_ = offset.x_;
+        projection.m11_ = scale.y_ * _uiScale;
+        projection.m13_ = offset.y_;
         projection.m22_ = 1.0f;
         projection.m23_ = 0.0f;
         projection.m33_ = 1.0f;
 
-        Urho3D::ShaderVariation* diffTextureVS = _graphics->GetShader(Urho3D::VS, "NuklearUI", "");
-        Urho3D::ShaderVariation* diffTexturePS = _graphics->GetShader(Urho3D::PS, "NuklearUI", "");
-        _graphics->SetShaders(diffTextureVS, diffTexturePS);
+        _graphics->ClearParameterSources();
+        _graphics->SetColorWrite(true);
+        _graphics->SetCullMode(CULL_NONE);
+        _graphics->SetDepthTest(CMP_ALWAYS);
+        _graphics->SetDepthWrite(false);
+        _graphics->SetFillMode(FILL_SOLID);
+        _graphics->SetStencilTest(false);
         _graphics->SetVertexBuffer(_vertex_buffer);
         _graphics->SetIndexBuffer(_index_buffer);
-        _graphics->SetShaderParameter(Urho3D::VSP_VIEWPROJ, projection);
-
         _vertex_buffer->Unlock();
         _index_buffer->Unlock();
 
-        unsigned offset = 0;
+        unsigned index = 0;
         const struct nk_draw_command* cmd;
-
         nk_draw_foreach(cmd, &_nk_ctx, &_commands)
         {
             if (!cmd->elem_count)
                 continue;
 
-            _graphics->SetTexture(0, (Urho3D::Texture2D*)cmd->texture.ptr);
-            _graphics->SetScissorTest(true, Urho3D::IntRect((int)cmd->clip_rect.x, (int)cmd->clip_rect.y,
-                                                            (int)(cmd->clip_rect.x + cmd->clip_rect.w),
-                                                            (int)(cmd->clip_rect.y + cmd->clip_rect.h)));
+            ShaderVariation* ps;
+            ShaderVariation* vs;
 
-            _graphics->Draw(Urho3D::TRIANGLE_LIST, offset, cmd->elem_count, 0, 0, _vertex_buffer->GetVertexCount());
+            Texture2D* texture = static_cast<Texture2D*>(cmd->texture.ptr);
+            if (!texture)
+            {
+                ps = _graphics->GetShader(PS, "Basic", "VERTEXCOLOR");
+                vs = _graphics->GetShader(VS, "Basic", "VERTEXCOLOR");
+            }
+            else
+            {
+                // If texture contains only an alpha channel, use alpha shader (for fonts)
+                vs = _graphics->GetShader(VS, "Basic", "DIFFMAP VERTEXCOLOR");
+                if (texture->GetFormat() == Graphics::GetAlphaFormat())
+                    ps = _graphics->GetShader(PS, "Basic", "ALPHAMAP VERTEXCOLOR");
+                else
+                    ps = _graphics->GetShader(PS, "Basic", "DIFFMAP VERTEXCOLOR");
+            }
 
-            offset += cmd->elem_count;
+            _graphics->SetShaders(vs, ps);
+            if (_graphics->NeedParameterUpdate(SP_OBJECT, this))
+                _graphics->SetShaderParameter(VSP_MODEL, Matrix3x4::IDENTITY);
+            if (_graphics->NeedParameterUpdate(SP_CAMERA, this))
+                _graphics->SetShaderParameter(VSP_VIEWPROJ, projection);
+            if (_graphics->NeedParameterUpdate(SP_MATERIAL, this))
+                _graphics->SetShaderParameter(PSP_MATDIFFCOLOR, Color(1.0f, 1.0f, 1.0f, 1.0f));
+
+            float elapsedTime = GetSubsystem<Time>()->GetElapsedTime();
+            _graphics->SetShaderParameter(VSP_ELAPSEDTIME, elapsedTime);
+            _graphics->SetShaderParameter(PSP_ELAPSEDTIME, elapsedTime);
+
+            IntRect scissor = IntRect((int)cmd->clip_rect.x, (int)cmd->clip_rect.y,
+                                      (int)(cmd->clip_rect.x + cmd->clip_rect.w),
+                                      (int)(cmd->clip_rect.y + cmd->clip_rect.h));
+            scissor.left_ = (int)(scissor.left_ * _uiScale);
+            scissor.top_ = (int)(scissor.top_ * _uiScale);
+            scissor.right_ = (int)(scissor.right_ * _uiScale);
+            scissor.bottom_ = (int)(scissor.bottom_ * _uiScale);
+
+            _graphics->SetBlendMode(BLEND_ALPHA);
+            _graphics->SetScissorTest(true, scissor);
+            _graphics->SetTexture(0, (Texture2D*)cmd->texture.ptr);
+            _graphics->Draw(TRIANGLE_LIST, index, cmd->elem_count, 0, 0, _vertex_buffer->GetVertexCount());
+            index += cmd->elem_count;
         }
         nk_clear(&_nk_ctx);
     }
-
     _graphics->SetScissorTest(false);
 }
