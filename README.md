@@ -13,8 +13,7 @@ Dependencies
 Usage
 =====
 
-1. Place `Shaders` directory in any of your resource dirs.
-2. Place initialization code in your Application::Start()
+Place initialization code in your Application::Start()
 
 ```
     auto nuklear = new NuklearUI(context_);
